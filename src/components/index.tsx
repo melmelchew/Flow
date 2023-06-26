@@ -1,6 +1,7 @@
 // components
 export {default as Controls} from './Controls';
-
+export {default as Sidebar} from './Sidebar';
+export {default as InfoSidebar} from './InfoSidebar'
 
 
 // initial

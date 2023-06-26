@@ -1,10 +1,25 @@
 import 'reactflow/dist/style.css';
 import { useCallback, useRef, DragEvent, useState, MouseEvent } from 'react';
 import ReactFlow, { ReactFlowInstance, Node, addEdge, Connection, Edge, useNodesState, useEdgesState, Background, BackgroundVariant, MiniMap, NodeProps, EdgeTypes } from 'reactflow';
-import {Controls, ClusterNode, initialNodes, initialEdges } from './components';
+import {Controls, ClusterNode, initialNodes, initialEdges, Sidebar, InfoSidebar } from './components';
 import styles from './dnd.module.css'
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { Switch } from '@mui/material'
 
-
+const theme = createTheme({
+  components: {
+    // Name of Component
+    MuiSwitch: {
+      styleOverrides: {
+        // Name of the slot
+        root: {
+          // Some CSS
+          zIndex: 5,
+        },
+      },
+    },
+  },
+});
 
 const nodeTypes = {
   clusterNode: ClusterNode
@@ -61,8 +76,39 @@ const App = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [reactFlowInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
   const onConnect = useCallback((params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+  const [isOpen, setIsOpen] = useState(false); // toggle sidebar
+  const [toggleInfo, setToggleInfo] = useState(false) //toggle node info sidebar
+  const [nodeInfo, setNodeInfo] = useState<Node>(); // selected node's info
 
   const onInit = useCallback((reactFlowInstance: ReactFlowInstance) => setRfInstance(reactFlowInstance), []); 
+
+  // methods for drag and drop//
+
+  const ToggleSidebar = () => {
+    isOpen === true ? setIsOpen(false) : setIsOpen(true);
+  }
+
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
+
+    if (reactFlowInstance) {
+      const type = event.dataTransfer.getData('application/reactflow');
+      const position = reactFlowInstance.project({
+        x: event.clientX,
+        y: event.clientY - 40,
+      });
+      const newNode: Node = {
+        id: getId(),
+        type,
+        position,
+        data: { label: `${type} node` },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    }
+  };
+
+// methods for drag and drop
 
 // method for dynamic grouping
 
@@ -89,14 +135,20 @@ const App = () => {
 //   setTarget(targetNode);
 //   console.log("The target node's center point is:", target)
 // };
-
+const onNodeClick = (event: MouseEvent, node: Node ) => {
+  console.log('Node is clicked:', node);
+  setToggleInfo(true)
+  setNodeInfo(node)
+};
 const handleDragEnd = useCallback(
   (event: MouseEvent<Element>, node: Node) => {
     let groupNode: Node = node;
 
-    if (node.type === "clusterNode" ) return;
-    if ( !("parentNode" in node) ) return;
+    if (node.type === "clusterNode") return;
 
+    if (reactFlowInstance){
+    const nodes = reactFlowInstance.getNodes()
+    
     nodes.forEach((nds: Node) => {
       if ("parentNode" in nds) {
         if (
@@ -136,8 +188,9 @@ const handleDragEnd = useCallback(
         });
       });
     }
-  },
-  [nodes, setNodes]
+  }
+},
+  [setNodes]
 );
 // method for dynamic grouping
 
@@ -151,17 +204,23 @@ const handleDragEnd = useCallback(
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
         // onNodeDragStart={onNodeDragStart}
         // onNodeDrag={onNodeDrag}
         onNodeDragStop={handleDragEnd}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         onDragOver={onDragOver}
+        onDrop={onDrop}
         style={rfStyle}
         minZoom={0.001}
         fitView
       >
-
+        <ThemeProvider theme={theme}>
+        <Switch checked={isOpen} onChange={ToggleSidebar} inputProps={{ 'aria-label': 'controlled' }} />
+        </ThemeProvider>
+        <Sidebar isOpen={isOpen} setIsOpen={setIsOpen}/>
+        <InfoSidebar toggleInfo={toggleInfo} setToggleInfo={setToggleInfo} node={nodeInfo} />
         <Background color="#ccc" variant={BackgroundVariant.Dots} />
         <Controls setNodes={setNodes} setEdges={setEdges} />
         <MiniMap nodeStrokeColor={nodeStrokeColor} nodeColor={nodeColor} zoomable pannable position='bottom-left'/>
